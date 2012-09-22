@@ -1,0 +1,111 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="author" content="angtian">
+    <meta name="description" content="淘宝旅行通用日历组件Demo3">
+    <meta name ="keywords" content="日历, 日历组件, 淘宝旅行日历">
+    <title>淘宝旅行通用日历组件Demo3</title>
+<style>
+body,form,ul,li,input{margin:0;padding:0;}
+body{font:12px/1.5 Arial;}
+.title{padding:0;margin:10px 0;font:700 18px/1.5 \5fae\8f6f\96c5\9ed1;text-align:center;}
+.title a{font:400 14px/1.5 Tahoma;margin-left:20px;}
+#search input{background:#FFF url(http://img02.taobaocdn.com/tps/i2/T122NIXoBAXXXXXXXX-200-200.png) 0 0 no-repeat;}
+#search{width:350px;margin:20px auto 0;border:1px solid #C4E6F1;}
+#search form{color:#666;border:2px solid #78B1C8;}
+#search ul{padding:10px 20px;vertical-align:top;}
+#search li{padding:5px 0;list-style:none;line-height:25px;zoom:1;}
+#search li:after{content:".";clear:both;display:block;height:0;	visibility:hidden;}
+#search label,#search input,#search span{float:left;}
+#search .tit{width:60px;min-height:25px;height:auto!important;height:25px;}
+#search .checkbox{margin-right:10px;}
+#search .checkbox input{margin:6px 5px 0 0;*margin:2px 0 0 -3px;background:none;}
+#search .f-text{padding:3px;width:179px;height:18px;color:#666;line-height:18px;font-family:inherit;border-color:#AFAFAF #DCDCDC #DCDCDC #AFAFAF;border-width:0 1px 1px 0;background-position:0 -100px;}
+#search .f-btn{border:0;width:85px;height:31px;cursor:pointer;}
+#search .f-btn:hover{background-position:-86px 0;}
+</style>
+<script src="http://yui.yahooapis.com/3.5.1/build/yui/yui-min.js"></script>
+<script>
+YUI({
+    modules: {
+        'trip-calendar': {
+            fullpath: 'trip-calendar.js',
+            type    : 'js',
+            requires: ['trip-calendar-css']
+        },
+        'trip-calendar-css': {
+            fullpath: 'trip-calendar.css',
+            type    : 'css'
+        }
+    }
+}).use('trip-calendar', function(Y) {
+    
+    var oCal = new Y.TripCalendar({
+        minDate         : new Date,     //最小时间限制
+        triggerNode     : '#J_DepDate', //第一个触节点
+        finalTriggerNode: '#J_EndDate'  //最后一个触发节点
+    });
+    
+    Y.one('#J_CheckBox')
+        .set('checked', false)
+            .on('click', function() {
+                oCal.set('isAutoSwitch', this.get('checked'));
+            });
+    
+    //校验
+    Y.one('#J_Search').on('submit', function(e) {
+        e.halt();
+        var rDate    = /^((19|2[01])\d{2})-(0?[1-9]|1[012])-(0?[1-9]|[12]\d|3[01])$/;
+            oDepDate = Y.one('#J_DepDate'),
+            oEndDate = Y.one('#J_EndDate'),
+            sDepDate = oDepDate.get('value'),
+            sEndDate = oEndDate.get('value'), 
+            aMessage = ['请选择出发日期', '请选择返程日期', '返程时间不能早于出发时间，请重新选择', '日期格式错误'],
+            iError   = -1;   
+            switch(!0) {
+                case !sDepDate:
+                    oDepDate.focus();
+                    iError = 0;
+                    break;
+                case !rDate.test(sDepDate):
+                    oDepDate.focus();
+                    iError = 3;
+                    break;
+                case !sEndDate:
+                    oEndDate.focus();
+                    iError = 1;
+                    break;
+                case !rDate.test(sEndDate):
+                    oEndDate.focus();
+                    iError = 3;
+                    break;
+                case sDepDate.replace(/-/g, '') > sEndDate.replace(/-/g, ''):
+                    oEndDate.focus();
+                    iError = 2;
+                    break;
+            };
+            if(iError > -1) {
+                this.set('message', aMessage[iError]).showMessage();                
+            }
+            else {
+                alert('开始时间：' + sDepDate + '\n返程时间：' + sEndDate);
+            }
+    }, oCal);
+});
+</script>
+</head>
+<body>
+<h1 class="title">淘宝旅行通用日历组件Demo3 <a href="Demo1.html">Demo1</a><a href="Demo2.html">Demo2</a><a href="Demo3.html">Demo3</a><a href="api.html" target="_blank">API文档</a></h1>
+<div id="search">
+    <form id="J_Search" target="_blank">
+        <ul>
+            <li><label class="checkbox"><input type="checkbox" id="J_CheckBox" /><span>自动切换到返程时间</span></label></li>
+            <li><label class="tit" for="J_DepDate">出发时间：</label><input id="J_DepDate" type="text" class="f-text" value="" /></li>
+            <li><label class="tit" for="J_EndDate">返程时间：</label><input id="J_EndDate" type="text" class="f-text" value="" /></li>
+            <li><label class="tit"></label><input id="J_search_btn" type="submit" class="f-btn" value="" /></li>
+        </ul>
+    </form>
+</div>
+</body>
+</html>
