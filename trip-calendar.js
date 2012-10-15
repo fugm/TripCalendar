@@ -105,6 +105,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
     initializer: function() {
         this.set('calendarId', 'calendar-' + (+new Date) +  Math.floor(Math.random() * (+new Date)));
         this.renderUI();
+        this._minDateCache = this.get('minDate');
         this.get('container') || this.hide();
     },
     
@@ -470,11 +471,17 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      */ 
     _setDefaultDate: function() {
         if(this.get('container')) return this;
-        if(this._boundingBox.hasClass('calendar-bounding-box-style') && this._toDate(this.get('endDate')).getMonth() == this._toDate(this.get('startDate')).getMonth() + 1) {
+        
+        this.get('startDate') && this.set('minDate', this._boundingBox.hasClass('calendar-bounding-box-style') ? this.get('startDate') : this._minDateCache).render();
+
+        if(this._boundingBox.hasClass('calendar-bounding-box-style') && (function(start, end) {
+            return start.getMonth()%12 + 1 >= (end.getFullYear() > start.getFullYear() ? end.getMonth() + 12 : end.getMonth());
+        })(this._toDate(this.get('startDate')), this._toDate(this.get('endDate')))) {
             this.set('date', this.get('startDate') || this.get('date'));
             return this;
         }
-        this.set('date', this._oTriggerNode.get('value') || this.get('date'));        
+        this.set('date', this._oTriggerNode.get('value') || this.get('date'));
+
         return this;
     },
     
