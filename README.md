@@ -3,7 +3,7 @@
 ####基于YUI3开发的价格日历组件
 
 	@name：Y.TripCalendar
-	@requires：['node', 'base-base', 'event-focus', 'event-mouseenter', 'event-outside']
+	@requires：['node', 'base-base', 'event-focus', 'event-mouseenter']
 	
 ##快速上手
 
@@ -197,16 +197,6 @@ YUI(config).use('trip-calendar', function(Y) {
 	> **概述**
 	>
 	> *(默认值：true) 是否显示节假日信息*
-	>
-	> **类型**
-	>
-	> `{Boole}`
-
-* ####isAutoSwitch
-
-	> **概述**
-	>
-	> *(默认值：false) 是否自动切换到结束时间*
 	>
 	> **类型**
 	>
@@ -487,10 +477,6 @@ YUI(config).use('trip-calendar', function(Y) {
         	//do something
     	});
 	```
-	> **注释**
-	>
-	> 已为此事件绑定render方法，在设置属性后无需再次调用render方法
-
 * ####countChange
 
 	> **概述**
@@ -652,21 +638,6 @@ YUI(config).use('trip-calendar', function(Y) {
 	```
 	var oCalendar = new Y.TripCalendar();
     	oCalendar.on('isHolidayChange', function(e) {
-        	//do something
-    	});
-	```
-	
-* ####isAutoSwitchChange
-
-	> **概述**
-	>
-	> *设置`isAutoSwitch`参数触发事件*
-	>
-	> **示例**
-	
-	```
-	var oCalendar = new Y.TripCalendar();
-    	oCalendar.on('isAutoSwitchChange', function(e) {
         	//do something
     	});
 	```

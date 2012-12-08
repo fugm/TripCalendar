@@ -20,15 +20,13 @@ var $      = Y.all,
     each   = Y.each,
     toHTML = L.sub,
     
-    IE        = Y.UA.ie,
-    REG       = /-|\//g,
-    RDATE     = /^((19|2[01])\d{2})-(0?[1-9]|1[012])-(0?[1-9]|[12]\d|3[01])$/,
-    
-    DELEGATE_CLICK    = 'delegate-click',
-    DELEGATE_CHANGE   = 'delegate-change',
-    DELEGATE_ICON     = 'delegate-icon',
-    TRIGGER_CLASSNAME = 'trigger-node';
+    IE     = Y.UA.ie,
+    REG    = /-|\//g,
+    RDATE  = /^((19|2[01])\d{2})-(0?[1-9]|1[012])-(0?[1-9]|[12]\d|3[01])$/,
 
+    BODY   = Y.one('body'),
+    WIN    = Y.one(window),
+    DOC    = Y.one(document);
 /**
   * 创建日历构造函数
   *
@@ -44,68 +42,14 @@ function Calendar() {
 Y.TripCalendar = Y.extend(Calendar, Y.Base, {
 
     /**
-     * 日历外容器
-     *
-     * @element _boundingBox
-     * @type {Node}
-     * @private
-     */
-    _boundingBox: null,
-    
-    /**
-     * 内容容器
-     *
-     * @element _contentBox
-     * @type {Node}
-     * @private
-     */    
-    _contentBox: null,
-    
-    /**
-     * 日历日期容器
-     *
-     * @element _dateBox
-     * @type {Node}
-     * @private
-     */
-    _dateBox: null, 
-
-    /**
-     * 消息容器
-     *
-     * @element _messageBox
-     * @type {Node}
-     * @private
-     */
-    _messageBox: null,
-    
-    /**
-     * 节假日数据地图
-     *
-     * @property _dateMap
-     * @type {Object}
-     * @private
-     */ 
-    _dateMap: null,    
-
-    /**
-     * 当前触发元素节点
-     *
-     * @element _oTriggerNode
-     * @type {Node}
-     * @private
-     */ 
-    _oTriggerNode: null,
-
-    /**
      * 日历初始化
      * 
      * @method initializer
      */      
     initializer: function() {
-        this.set('calendarId', 'calendar-' + (+new Date) +  Math.floor(Math.random() * (+new Date)));
-        this.renderUI();
+        this._setUniqueTag().renderUI();
         this._minDateCache = this.get('minDate');
+        this._clickoutside = function(e) {e.target.hasClass(this._triggerNodeClassName) || e.target.hasClass(this._triggerNodeIcon) || e.target.ancestor('#' + this._calendarId) || this.hide();};
         this.get('container') || this.hide();
     },
     
@@ -115,16 +59,20 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @method renderUI
      */ 
     renderUI: function() {
-        Y.one(this.get('container') || 'body').append(this._initCalendarHTML(this.get('date')));
-        (function(that, boundingBox) {
-            that._dateBox    = boundingBox.one('.date-box');
-            that._contentBox = boundingBox.one('.content-box');
-            that._messageBox = boundingBox.one('.message-box');
-            boundingBox.setStyle('position', that.get('container') ? 'relative' : 'absolute');
-            that.get('container') || (that._inputWrap()._setDefaultValue(), boundingBox.setStyle('top', '-9999px'));
-            that.bindUI()._fixSelectMask()._setWidth()._setBtnStates()._setDateStyle();
-            that.set('boundingBox', boundingBox);
-        })(this, this._boundingBox = Y.one('#' + this.get('calendarId')));
+        var container = Y.one(this.get('container'));
+
+        (container || BODY).append(this._initCalendarHTML(this.get('date')));
+
+        this.boundingBox = Y.one('#' + this._calendarId).setStyle('position', container ? 'relative' : 'absolute');
+        this._dateBox    = this.boundingBox.one('.date-box');
+        this._contentBox = this.boundingBox.one('.content-box');
+        this._messageBox = this.boundingBox.one('.message-box');
+
+        container || (this._inputWrap()._setDefaultValue(), this.boundingBox.setStyle('top', '-9999px'));
+
+        this.set('boundingBox', this.boundingBox);
+        
+        this.bindUI()._fixSelectMask()._setWidth()._setBtnStates()._setDateStyle();
     },
     
     /**
@@ -133,23 +81,23 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @method bindUI
      */ 
     bindUI: function() {
-        (function(that, boundingBox, win, doc) {
-            that.after('dateChange', that.render);
-            that.after('messageChange', that._setMessage);
-            boundingBox.delegate('click', that._clickDelegate, '.' + DELEGATE_CLICK, that);
-            boundingBox.delegate('change', that._changeDelegate, '.' + DELEGATE_CHANGE, that);
-            if(that.get('container')) return;
-            boundingBox.on('mousedown', that._mousedown, that);
-            boundingBox.on('clickoutside', that._clickoutside, that);
-            boundingBox.delegate(['mouseenter', 'mouseleave'], that._mouseDelegate, 'a', that);
-            doc.delegate('focus', that._focusDelegate, '.' + TRIGGER_CLASSNAME, that);
-            doc.delegate('blur', that._blurDelegate, '.' + TRIGGER_CLASSNAME, that);
-            doc.delegate('keyup', that._keyup, '.' + TRIGGER_CLASSNAME, that);
-            doc.delegate('click', that._infoClickDelegate, '.' + DELEGATE_ICON, that);
-            doc.delegate('click', that._selectDelegate, '.' + TRIGGER_CLASSNAME);
-            doc.delegate('mousedown', that._mousedown, '.' + DELEGATE_ICON, that);
-            win.on('resize', that._rectify, that);      
-        })(this, this._boundingBox, Y.one(window), Y.one(document));
+        this.after('messageChange', this._setMessage);
+
+        this.boundingBox.delegate('click', this._DELEGATE.click, '.' + this._delegateClickClassName, this);
+        this.boundingBox.delegate('change', this._DELEGATE.change, '.' + this._delegateChangeClassName, this);
+
+        if(this.get('container')) return this;
+        
+        this.boundingBox.delegate(['mouseenter', 'mouseleave'], this._DELEGATE.mouse, 'a', this);
+
+        DOC.delegate('focus', this._DELEGATE.focus, '.' + this._triggerNodeClassName, this);
+        DOC.delegate('keyup', this._DELEGATE.keyup, '.' + this._triggerNodeClassName, this);
+        DOC.delegate('keydown', this._DELEGATE.keydown, '.' + this._triggerNodeClassName, this);
+        DOC.delegate('click', this._DELEGATE.iconClick, '.' + this._triggerNodeIcon, this);
+        DOC.delegate('click', this._DELEGATE.triggerNodeClick, '.' + this._triggerNodeClassName);
+  
+        WIN.on('resize', this._setPos, this);
+
         return this;
     },
    
@@ -181,6 +129,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      */         
     nextMonth: function() {
         this.set('date', this._getSiblingMonth(this.get('date'), 1));
+        this.render();
         this.fire('nextmonth');
         return this;
     },
@@ -192,6 +141,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      */         
     prevMonth: function() {
         this.set('date', this._getSiblingMonth(this.get('date'), -1));
+        this.render();
         this.fire('prevmonth');
         return this;
     },
@@ -202,10 +152,12 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @method show
      */
     show: function() {
-        this._setDefaultDate();
-        this._boundingBox.show();
-        this.fire('show', {node: this._oTriggerNode});
-        return this;
+        DOC.on('click', this._clickoutside, this);
+
+        this.boundingBox.show();
+        this._setDefaultDate().render();
+        this.fire('show', {'node': this.currentNode});
+        return this;        
     },
     
     /**
@@ -214,9 +166,13 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @method hide
      */
     hide: function() {
-        this._boundingBox.hide();
-        this._oTriggerNode && this._oTriggerNode.blur();
+        DOC.detach('click', this._clickoutside, this);
+
+        this.boundingBox.hide();
         this.hideMessage();
+        this.currentNode && (this.currentNode._node._selected = null);
+        this._cacheNode = null;
+        this.fire('hide', {'node': this.currentNode});
         return this;
     },
     
@@ -263,7 +219,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @return {Node} 节点对象
      */
     getCurrentNode: function() {
-        return this._oTriggerNode;
+        return this.currentNode;
     },    
 
     /**
@@ -276,7 +232,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
     getDateInfo: function(v) {
         var iDiff     = -1,
             sNowDate  = this._toStringDate(new Date),
-            sDateName = ['\u4eca\u5929', '\u660e\u5929', '\u540e\u5929'];
+            sDateName = ['今天', '明天', '后天'];
         switch(true) {
             case v == sNowDate:
                 iDiff = 0;
@@ -301,7 +257,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @return {String} 星期几
      */
     _getWeek: function(v) {
-        return '\u661f\u671f' + ['\u65e5', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d'][this._toDate(v).getDay()];
+        return '星期' + ['日', '一', '二', '三', '四', '五', '六'][this._toDate(v).getDay()];
     },    
     
     /**
@@ -404,7 +360,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                 width : boundingBox.get('offsetWidth'),
                 height: boundingBox.get('offsetHeight')
             });
-        })(this, this._boundingBox, this._contentBox);
+        })(this, this.boundingBox, this._contentBox);
         return this;
     },
     
@@ -416,12 +372,12 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
     _setValue: function(v) {
         this.set('selectedDate', v);
         if(this.get('container')) return this;
-        this._isInput(this._oTriggerNode) && this._oTriggerNode.set('value', v);
+        this._isInput(this.currentNode) && this.currentNode.set('value', v);
         switch(true) {
-            case this._boundingBox.hasClass('calendar-bounding-box-style'):
+            case this.boundingBox.hasClass('calendar-bounding-box-style'):
                 this.set('endDate', v);
                 break;
-            case !this._boundingBox.hasClass('calendar-bounding-box-style') && !!this.get('finalTriggerNode'):
+            case !this.boundingBox.hasClass('calendar-bounding-box-style') && !!this.get('finalTriggerNode'):
                 this.set('startDate', v);
                 break;
             default:
@@ -438,8 +394,8 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @param {String} v 日期字符串
      */    
     _setDateInfo: function(v) {
-        if(this.get('container') || !this.get('isDateInfo') || !this._isInput(this._oTriggerNode)) return this;
-        this._oTriggerNode.previous().setContent(RDATE.test(v) ? this.getDateInfo(v) : '');
+        if(this.get('container') || !this.get('isDateInfo') || !this._isInput(this.currentNode)) return this;
+        this.currentNode.previous().setContent(RDATE.test(v) ? this.getDateInfo(v) : '');
         return this;
     },
     
@@ -472,15 +428,15 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
     _setDefaultDate: function() {
         if(this.get('container')) return this;
         
-        this.get('startDate') && this.set('minDate', this._boundingBox.hasClass('calendar-bounding-box-style') ? this.get('startDate') : this._minDateCache).render();
+        this.get('startDate') && this.set('minDate', this.boundingBox.hasClass('calendar-bounding-box-style') ? this.get('startDate') : this._minDateCache).render();
 
-        if(this._boundingBox.hasClass('calendar-bounding-box-style') && (function(start, end) {
+        if(this.boundingBox.hasClass('calendar-bounding-box-style') && (function(start, end) {
             return start.getMonth()%12 + 1 >= (end.getFullYear() > start.getFullYear() ? end.getMonth() + 12 : end.getMonth());
         })(this._toDate(this.get('startDate')), this._toDate(this.get('endDate')))) {
             this.set('date', this.get('startDate') || this.get('date'));
             return this;
         }
-        this.set('date', this._oTriggerNode.get('value') || this.get('date'));
+        this.set('date', this.currentNode.get('value') || this.get('date'));
 
         return this;
     },
@@ -491,7 +447,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @method _setDateStyle
      */
     _setDateStyle: function() {
-        var boundingBox   = this._boundingBox,
+        var boundingBox   = this.boundingBox,
             startDate     = this.get('startDate'),
             endDate       = this.get('endDate'),
             selectedDate  = this.get('selectedDate'),
@@ -524,9 +480,9 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
         var curDate  = +this._getSiblingMonth(this.get('date'), 0),
             maxDate  = this.get('maxDate'),
             minDate  = this.get('minDate'),
-            prevBtn  = this._boundingBox.one('.prev-btn'),
-            nextBtn  = this._boundingBox.one('.next-btn'),
-            closeBtn = this._boundingBox.one('.close-btn');
+            prevBtn  = this.boundingBox.one('.prev-btn'),
+            nextBtn  = this.boundingBox.one('.next-btn'),
+            closeBtn = this.boundingBox.one('.close-btn');
             if(minDate) {
                 minDate = +this._toDate(minDate);
             }
@@ -549,6 +505,54 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
         this._messageBox.setContent(this.get('message'));
         return this;
     },
+
+    /**
+     * 设置唯一标记
+     *
+     * @method _setUniqueTag
+     * @private
+     */
+    _setUniqueTag: function() {
+        (function(that, guid) {
+            that._calendarId              = 'calendar-' + guid;
+            that._delegateClickClassName  = 'delegate-click-' + guid;
+            that._delegateChangeClassName = 'delegate-change-' + guid;
+            that._triggerNodeIcon         = 'trigger-icon-' + guid;
+            that._triggerNodeClassName    = 'trigger-node-' + guid;
+        })(this, Y.guid());
+        return this;
+    },
+
+    /**
+     * 设置日历显示位置
+     * 
+     * @method _setPos
+     * @private
+     */    
+    _setPos: function() {
+        (function(that, currentNode) {
+            if(!currentNode) return;
+            setTimeout(function() {
+                var iLeft              = currentNode.getX(),
+                    iTop               = currentNode.getY() + currentNode.get('offsetHeight'),        
+                    iBoundingBoxWidth  = that.boundingBox.get('offsetWidth'),
+                    iBoundingBoxHeight = that.boundingBox.get('offsetHeight'),
+                    iCurrentNodeWidth  = currentNode.get('offsetWidth'),
+                    iCurrentNodeHeight = currentNode.get('offsetHeight'),
+                    iMaxLeft           = currentNode.get('winWidth') * 1 + currentNode.get('docScrollX') - iBoundingBoxWidth,
+                    iMaxTop            = currentNode.get('winHeight') * 1 + currentNode.get('docScrollY') - iBoundingBoxHeight;
+                (function(t, l) {
+                    if(iTop > iMaxTop) iTop = t < 0 ? iTop : t;
+                    if(iLeft > iMaxLeft) iLeft = l < 0 ? iLeft : l;
+                })(iTop - iBoundingBoxHeight - iCurrentNodeHeight, iLeft + iCurrentNodeWidth - iBoundingBoxWidth);   
+                that.boundingBox.setStyles({
+                    top : iTop,
+                    left: iLeft
+                });            
+            }, 10);
+        })(this, this.currentNode);
+        return this;
+    },
     
     /**
      * 创建触发元素外容器
@@ -561,147 +565,24 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
             triggerNodeList.each(function(o) {
                 if((that.get('isDateInfo') || that.get('isDateIcon')) && that._isInput(o) && !o.ancestor('.calendar-input-wrap')) {
                     o.wrap(Calendar.INPUT_WRAP_TEMPLATE);
-                    o.insert(toHTML(Calendar.START_DATE_TEMPLATE, {'delegate_icon': DELEGATE_ICON}), 'before');
+                    o.insert(toHTML(Calendar.START_DATE_TEMPLATE, {'delegate_icon': that._triggerNodeIcon}), 'before');
                     that.get('isDateIcon') || o.previous().removeClass('calendar-start-icon');
                 }
-                o.addClass(TRIGGER_CLASSNAME);
+                o.addClass(that._triggerNodeClassName);
             });
             finalTriggerNodeList.each(function(o) {
                 if((that.get('isDateInfo') || that.get('isDateIcon')) && that._isInput(o) && !o.ancestor('.calendar-input-wrap')) {
                     o.wrap(Calendar.INPUT_WRAP_TEMPLATE);
-                    o.insert(toHTML(Calendar.END_DATE_TEMPLATE, {'delegate_icon': DELEGATE_ICON}), 'before');
+                    o.insert(toHTML(Calendar.END_DATE_TEMPLATE, {'delegate_icon': that._triggerNodeIcon}), 'before');
                     that.get('isDateIcon') || o.previous().removeClass('calendar-end-icon');
                 }
-                o.addClass(TRIGGER_CLASSNAME);
+                o.addClass(that._triggerNodeClassName);
             });
             //triggerNodeList.concat(finalTriggerNodeList).wrap(Calendar.INPUT_WRAP_TEMPLATE);
             //triggerNodeList.insert(Calendar.START_DATE_TEMPLATE, 'before');
             //finalTriggerNodeList.insert(Calendar.END_DATE_TEMPLATE, 'before');
         })(this, $(this.get('triggerNode')), $(this.get('finalTriggerNode')));
         return this;
-    },
-
-    /**
-     * 触发元素获得焦点事件
-     * 
-     * @method _focus
-     * @private
-     */
-    _focus: function(currentNode) {
-        (function(that, boundingBox, triggerNodeList, className) {
-            setTimeout(function() {
-                clearTimeout(that.hideTimer);
-            }, IE != 6 ? 10 : 30);
-            if(!currentNode) return;
-            that._cacheNode && (that._cacheNode != currentNode) && that.fire('hide', {node: that._cacheNode});
-            triggerNodeList.indexOf(currentNode) != -1 ? boundingBox.removeClass(className) : boundingBox.addClass(className); 
-            that._oTriggerNode = currentNode;
-            that.hideMessage().show()._setWidth()._rectify();
-        })(this, this._boundingBox, $(this.get('triggerNode')), 'calendar-bounding-box-style');    
-    },
-    
-    /**
-     * 触发元素失去焦点事件
-     * 
-     * @method _blur
-     * @private
-     */
-    _blur: function(currentNode) {  
-        (function(that) {
-            that._cacheNode = currentNode;
-            that._cacheNode && (that._oTriggerNode._isSelect = null);
-            clearTimeout(that.hideTimer);
-            that.hideTimer = setTimeout(function() {
-                that._boundingBox.getStyle('display') == 'block' && that.fire('hide', {node: that._oTriggerNode});
-                that.hide();
-            }, IE != 6 ? 100 : 200);
-        })(this);        
-    },
-    
-    /**
-     * 日历容器鼠标按下事件
-     * 
-     * @method _mousedown
-     * @private
-     */    
-    _mousedown: function(e) {
-        this._focus();
-    },      
-    
-    /**
-     * 获得焦点代理
-     * 
-     * @method _focusDelegate
-     * @param {Event} e 事件对象
-     * @private
-     */
-    _focusDelegate: function(e) {
-        this._focus(e.currentTarget);
-    },
-    
-    /**
-     * 失去焦点代理
-     * 
-     * @method _blurDelegate
-     * @param {Event} e 事件对象
-     * @private
-     */
-    _blurDelegate: function(e) {
-        this._blur(e.currentTarget)
-    },
-    
-    /**
-     * 容器外部点击事件
-     * 
-     * @method _clickoutside
-     * @private
-     */
-    _clickoutside: function(e) {
-        e.target.hasClass(TRIGGER_CLASSNAME) || e.target.hasClass(DELEGATE_ICON) || this._blur();
-    },
-    
-    /**
-     * 日历点击事件代理
-     * 
-     * @method _clickDelegate
-     * @private
-     */ 
-    _clickDelegate: function(e) {
-        var oTarget = e.currentTarget,
-            sDate   = oTarget.getAttribute('data-date');
-        switch(true) {
-            case oTarget.hasClass('prev-btn') && !oTarget.hasClass('prev-btn-disabled'):
-                this.prevMonth();
-                break;
-            case oTarget.hasClass('next-btn') && !oTarget.hasClass('next-btn-disabled'):
-                this.nextMonth();
-                break;
-            case oTarget.hasClass('close-btn'):
-                this.hide().fire('hide', {node: this._oTriggerNode});
-                this._cacheNode = null;
-                break;
-            case !!oTarget.getAttribute('data-date') && !oTarget.hasClass('disabled'):
-                this._setValue(sDate)
-                    ._setDateInfo(sDate)
-                    ._setDateStyle()
-                    ._afterSetValue()
-                    .fire('dateclick', {
-                        date: sDate,
-                        dateInfo: this.getDateInfo(sDate)
-                    });
-                break;
-        }    
-    },
-
-    /**
-     * selectChange事件代理
-     * 
-     * @method _changeDelegate
-     * @private
-     */     
-    _changeDelegate: function() {
-        var selectList = this._boundingBox.all('.' + DELEGATE_CHANGE);
-        this.set('date', selectList.item(0).get('value') + '-' + selectList.item(1).get('value') + '-01');
     },
 
     /**
@@ -712,7 +593,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      */      
     _fixIEChange: function() {
         if(!this.get('isSelect') || IE > 8 || !IE) return this;
-        this._boundingBox.all('.' + DELEGATE_CHANGE).on('change', this._changeDelegate, this);
+        this.boundingBox.all('.' + this._delegateChangeClassName).on('change', this._DELEGATE.change, this);
         return this;
     },
     
@@ -723,35 +604,8 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @private
      */     
     _fixSelectMask: function() {
-        IE === 6 && this._boundingBox.append('<iframe />');
+        IE === 6 && this.boundingBox.append('<iframe />');
         return this;
-    },
-    
-    /**
-     * 日历信息容器点击事件代理
-     * 
-     * @method _infoClickDelegate
-     * @private
-     */
-    _infoClickDelegate: function(e) {
-        var oTarget = e.target.next();
-        if(oTarget != this._oTriggerNode || this._boundingBox.getStyle('display') == 'none') {
-            oTarget.focus();
-            oTarget._node.select && (oTarget.select()._isSelect = true);
-        }
-    },
-
-    /**
-     * 输入框点击事件代理
-     * 
-     * @method _selectDelegate
-     * @private
-     */      
-    _selectDelegate: function(e) {
-        var oTarget = e.target;
-        if(oTarget._node.select && !oTarget._isSelect) {
-            oTarget.select()._isSelect = true;
-        }
     },
     
     /**
@@ -762,7 +616,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @private
      */
     _mouseenter: function(oTarget) {
-        var boundingBox = this._boundingBox,
+        var boundingBox = this.boundingBox,
             startDate   = this.get('startDate'),
             curDate     = oTarget.getAttribute('data-date'),
             iDiff       = this._getDateDiff(startDate, curDate),
@@ -788,101 +642,137 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
         (function(that) {
             clearTimeout(that.leaveTimer);
             that.leaveTimer = setTimeout(function() {
-                that._boundingBox.all('td').removeClass('hover'); 
+                that.boundingBox.all('td').removeClass('hover'); 
             }, 30);
         })(this);
     },
-    
-    /**
-     * 鼠标移入/移出事件代理
-     * 
-     * @method _mouseDelegate  
-     * @param {Event} e 事件对象
-     * @private
-     */    
-    _mouseDelegate: function(e) {
-        var oTarget = e.currentTarget.ancestor('td');
-        if(oTarget.hasClass('disabled')) return;
-        switch(e.type) {
-            case 'mouseenter':
-                this._boundingBox.hasClass('calendar-bounding-box-style') && 
-                !!this.get('startDate') &&
-                this._mouseenter(oTarget);                   
-                break;
-            case 'mouseleave':
-                this._mouseleave();
-                break;
-        }    
-    },  
 
     /**
-     * 输入框输入事件
+     * 事件代理
      * 
-     * @method _keyup  
-     * @private
+     * @type {Object}
      */
-    _keyup: function(e) {
-        if(!this.get('isKeyup')) return;
-        clearTimeout(this.keyupTimer);
-        var that = this,
-            oTarget = e.currentTarget;
-        if(!this._isInput(oTarget)) return;
-        var v = oTarget.get('value');
-        that._setDateInfo(v);
-        if(!RDATE.test(v)) return;
-        this.keyupTimer = setTimeout(function() {
-            v = that._toStringDate(that._toDate(v));
-            that._setValue(v);
-            that.set('date', v);
-        }, 200);
-    },
-    
-    /**
-     * 赋值后处理方法
-     * 
-     * @method _afterSetValue
-     */    
-    _afterSetValue: function() {
-        if(this.get('container')) return this;        
-        this.hide().fire('hide', {node: this._oTriggerNode});
-        this._cacheNode = null;       
-        var finalTriggerNode = Y.one(this.get('finalTriggerNode'));
-        if(!this._boundingBox.hasClass('calendar-bounding-box-style') && finalTriggerNode && this.get('isAutoSwitch')) {
-            finalTriggerNode._node.select && (finalTriggerNode.select()._isSelect = true);
+    _DELEGATE: {
+        // 日历点击事件处理函数
+        'click': function(e) {
+            e.halt();
+            var target = e.currentTarget,
+                date   = target.getAttribute('data-date');
+            switch(!0) {
+                case target.hasClass('prev-btn') && !target.hasClass('prev-btn-disabled'):
+                    this.prevMonth();
+                    break;
+                case target.hasClass('next-btn') && !target.hasClass('next-btn-disabled'):
+                    this.nextMonth();
+                    break;
+                case target.hasClass('close-btn'):
+                    this.hide();
+                    break;
+                case !!target.getAttribute('data-date') && !target.hasClass('disabled'):
+                    this.get('container') || this.hide();
+                    this._setValue(date)
+                        ._setDateInfo(date)
+                        ._setDateStyle()
+                        .fire('dateclick', {
+                            date: date,
+                            dateInfo: this.getDateInfo(date)
+                        });
+                    break;
+            }
+        },
+
+        // select元素日期选择事件处理函数
+        'change': function(e) {
+            var selectList = this.boundingBox.all('.' + this._delegateChangeClassName);
+            this.set('date', selectList.item(0).get('value') + '-' + selectList.item(1).get('value') + '-01');
+            this.render();
+        },
+
+        // 鼠标移入/移出事件处理函数
+        'mouse': function(e) {
+            var target = e.currentTarget.ancestor('td');
+            if(target.hasClass('disabled')) return;
+            switch(e.type) {
+                case 'mouseenter':
+                    this.boundingBox.hasClass('calendar-bounding-box-style') && 
+                    !!this.get('startDate') &&
+                    this._mouseenter(target);                   
+                    break;
+                case 'mouseleave':
+                    this._mouseleave();
+                    break;
+            }
+        },
+
+        // 触发元素获取焦点处理函数
+        'focus': function(e) {
+            var target  = this.currentNode = e.currentTarget;
+
+            // 标记入住日历/离店日历。离店日历有className[check-out]
+            this.boundingBox[$(this.get('triggerNode')).indexOf(target) != -1 ? 'removeClass' : 'addClass']('calendar-bounding-box-style');
+            
+            this.hideMessage();
+
+            // 当缓存触发节点与当前触发节点不匹配时，调用一次hide方法
+            this._cacheNode && this._cacheNode._node != target._node && this.hide();
+
+            // 当日历隐藏时，调用show方法
+            this.boundingBox.getStyle('display') == 'none' && this.show()._setWidth()._setPos();
+
+            // 重新设置缓存触发节点
+            this._cacheNode = target;
+        },
+
+        // 输入框输入事件处理函数
+        'keyup': function(e) {
+            if(!this.get('isKeyup')) return;
+
+            clearTimeout(this.keyupTimer);
+            
+            var that   = this,
+                target = e.currentTarget;
+            
+            if(!this._isInput(target)) return;
+            
+            var v = target.get('value');
+            
+            that._setDateInfo(v);
+            
+            if(!RDATE.test(v)) return;
+            
+            this.keyupTimer = setTimeout(function() {
+                v = that._toStringDate(that._toDate(v));
+                that._setValue(v);
+                that.set('date', v);
+                that.render();
+            }, 200);
+        },
+
+        // 输入框Tab事件处理函数
+        'keydown': function(e) {
+            if(e.keyCode != 9) return;
+            this.hide();
+        },
+
+        // icon点击事件处理函数
+        'iconClick': function(e) {
+            var target = e.target.next();
+
+            if(target != this.currentNode || this.boundingBox.getStyle('display') == 'none') {
+                target.focus();
+            }
+        },
+
+        // 触发元素点击事件处理函数
+        'triggerNodeClick': function(e) {
+            var target = e.target._node;
+
+            if(target._selected) return;
+
+            target.select();
+            target._selected = true;
         }
-        return this;
-    },    
-    
-    /**
-     * 纠正显示位置
-     * 
-     * @method _rectify
-     * @private
-     */    
-    _rectify: function() {
-        (function(that, currentNode) {
-            if(!currentNode) return;
-            setTimeout(function() {
-                var iLeft              = currentNode.getX(),
-                    iTop               = currentNode.getY() + currentNode.get('offsetHeight'),        
-                    iBoundingBoxWidth  = that._boundingBox.get('offsetWidth'),
-                    iBoundingBoxHeight = that._boundingBox.get('offsetHeight'),
-                    iCurrentNodeWidth  = currentNode.get('offsetWidth'),
-                    iCurrentNodeHeight = currentNode.get('offsetHeight'),
-                    iMaxLeft           = currentNode.get('winWidth') * 1 + currentNode.get('docScrollX') - iBoundingBoxWidth,
-                    iMaxTop            = currentNode.get('winHeight') * 1 + currentNode.get('docScrollY') - iBoundingBoxHeight;
-                (function(t, l) {
-                    if(iTop > iMaxTop) iTop = t < 0 ? iTop : t;
-                    if(iLeft > iMaxLeft) iLeft = l < 0 ? iLeft : l;
-                })(iTop - iBoundingBoxHeight - iCurrentNodeHeight, iLeft + iCurrentNodeWidth - iBoundingBoxWidth);   
-                that._boundingBox.setStyles({
-                    top : iTop,
-                    left: iLeft
-                });            
-            }, 10);
-        })(this, this._oTriggerNode);
-        return this;
-    }, 
+    },   
     
     /**
      * 获取同排显示的日历中最大的单元格数
@@ -977,7 +867,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
             maxMonth = maxDate && maxDate.substr(5, 2) || 12,
             selected = ' selected="selected"',
             select_template = {};
-            select_template['delegate_change'] = DELEGATE_CHANGE;
+            select_template['delegate_change'] = this._delegateChangeClassName;
             select_template['year_template']   = '';
             select_template['month_template']  = '';
             curYear == minYear || curYear == maxYear || (minMonth = 1, maxMonth = 12);
@@ -1010,7 +900,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                     var curDate = this._getSiblingDate(sDate, j - 3); 
                     (function(j, v) {
                         oTmp[curDate] = oTmp[curDate] ? j > 2 ? v : oTmp[curDate] : v;
-                    })(j, sName + (j != 3 ? (j < 3 ? '\u524d' : '\u540e') + Math.abs(j - 3) + '\u5929' : ''));
+                    })(j, sName + (j != 3 ? (j < 3 ? '前' : '后') + Math.abs(j - 3) + '天' : ''));
                 }
             }   
         }
@@ -1027,8 +917,8 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      */        
     _initCalendarHTML: function() {
         var calendar_template                     = {};
-            calendar_template['delegate_click']   = DELEGATE_CLICK;
-            calendar_template['bounding_box_id']  = this.get('calendarId');
+            calendar_template['delegate_click']   = this._delegateClickClassName;
+            calendar_template['bounding_box_id']  = this._calendarId;
             calendar_template['message_template'] = this.get('message');
             calendar_template['date_template']    = this._dateHTML();
         return toHTML(Calendar.CALENDAR_TEMPLATE, calendar_template);       
@@ -1067,13 +957,13 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
             iMonth    = date.getMonth() + 1,
             firstDays = new Date(iYear, iMonth - 1, 1).getDay(),
             monthDays = new Date(iYear, iMonth, 0).getDate(),
-            weekdays  = [{wd: '\u65e5', weekend: 'weekend'},
-                         {wd: '\u4e00'},
-                         {wd: '\u4e8c'},
-                         {wd: '\u4e09'},
-                         {wd: '\u56db'},
-                         {wd: '\u4e94'},
-                         {wd: '\u516d', weekend: 'weekend'}];
+            weekdays  = [{wd: '日', weekend: 'weekend'},
+                         {wd: '一'},
+                         {wd: '二'},
+                         {wd: '三'},
+                         {wd: '四'},
+                         {wd: '五'},
+                         {wd: '六', weekend: 'weekend'}];
         //week template string                
         var weekday_template = '';
             each(weekdays, function(v) {
@@ -1098,7 +988,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                         {
                             'day': days,
                             'date': date,
-                            'disabled': this._getDateStatus(date) || !days ? 'disabled' : DELEGATE_CLICK,
+                            'disabled': this._getDateStatus(date) || !days ? 'disabled' : this._delegateClickClassName,
                             'date_class': this._getHolidaysClass(date, this._getDateStatus(date) || !days)
                         }
                     )  
@@ -1114,7 +1004,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
             table_template['body_template'] = body_template;
         //single Calendar object
         var single_calendar_template = {};
-            single_calendar_template['date'] = this.get('isSelect') ? this._createSelect() : iYear + '\u5e74' + iMonth + '\u6708';
+            single_calendar_template['date'] = this.get('isSelect') ? this._createSelect() : iYear + '年' + iMonth + '月';
             single_calendar_template['table_template'] = toHTML(Calendar.TABLE_TEMPLATE, table_template);
         //return single Calendar template object
         return single_calendar_template;
@@ -1135,9 +1025,9 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                                 '</div>' +
                                 '<div class="content-box">' +
                                     '<div class="arrow">' +
-                                        '<span class="close-btn {delegate_click}" title="\u5173\u95ed">close</span>' +
-                                        '<span class="prev-btn {delegate_click}" title="\u4e0a\u6708">prev</span>' +
-                                        '<span class="next-btn {delegate_click}" title="\u4e0b\u6708">next</span>' +
+                                        '<span class="close-btn {delegate_click}" title="关闭">close</span>' +
+                                        '<span class="prev-btn {delegate_click}" title="上月">prev</span>' +
+                                        '<span class="next-btn {delegate_click}" title="下月">next</span>' +
                                     '</div>' +
                                     '<div class="date-box">' +
                                         '{date_template}' +
@@ -1156,11 +1046,11 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
     SELECT_TEMPLATE: '<select class="{delegate_change}">' +
                         '{year_template}' +
                      '</select>' +
-                     '\u5e74' +
+                     '年' +
                      '<select class="{delegate_change}">' +
                         '{month_template}' +
                      '</select>' +
-                     '\u6708',
+                     '月',
                         
     TABLE_TEMPLATE: '<table>' +    
                         '<thead>' +
@@ -1199,16 +1089,16 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @static
      */     
     DATENAME: {
-        "today"   : "\u4eca\u5929",
-        "yuandan" : "\u5143\u65e6",
-        "chuxi"   : "\u9664\u5915",
-        "chunjie" : "\u6625\u8282",
-        "yuanxiao": "\u5143\u5bb5\u8282",
-        "qingming": "\u6e05\u660e",
-        "wuyi"    : "\u52b3\u52a8\u8282",
-        "duanwu"  : "\u7aef\u5348\u8282",
-        "zhongqiu": "\u4e2d\u79cb\u8282",
-        "guoqing" : "\u56fd\u5e86\u8282"
+        "today"   : "今天",
+        "yuandan" : "元旦",
+        "chuxi"   : "除夕",
+        "chunjie" : "春节",
+        "yuanxiao": "元宵节",
+        "qingming": "清明",
+        "wuyi"    : "劳动节",
+        "duanwu"  : "端午节",
+        "zhongqiu": "中秋节",
+        "guoqing" : "国庆节"
     },
 
     /**
@@ -1235,7 +1125,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      *
      * @property NAME
      * @type String
-     * @default 'TripCalendar'
+     * @default 'TCalendar'
      * @readOnly
      * @protected
      * @static
@@ -1251,16 +1141,6 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      * @static
      */
     ATTRS: {
-
-        /**
-         * 日历唯一ID
-         *
-         * @attribute calendarId
-         * @type {String}
-         */
-        calendarId: {
-            readOnly: true
-        },
     
         /**
          * 日历外容器
@@ -1552,19 +1432,8 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                 if(!v) this._dateMap = null;
                 return v;
             }
-        },
-        
-        /**
-         * 是否自动切换到结束时间
-         *
-         * @attribute isAutoSwitch
-         * @type {Boole}
-         * @default false
-         */
-        isAutoSwitch: {
-            value: false
         }
     }
 });
 
-}, '1.0', {requires: ['node', 'base-base', 'event-focus', 'event-mouseenter', 'event-outside']});
+}, '1.0', {requires: ['node', 'base-base', 'event-focus', 'event-mouseenter']});
