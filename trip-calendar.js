@@ -379,6 +379,10 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                 break;
             case !this.boundingBox.hasClass('calendar-bounding-box-style') && !!this.get('finalTriggerNode'):
                 this.set('startDate', v);
+                var finalTriggerNode = Y.one(this.get('finalTriggerNode'));
+                if(finalTriggerNode && this.get('isAutoSwitch')) {
+                    finalTriggerNode._node.select();
+                }
                 break;
             default:
                 this.set('selectedDate', v);
@@ -1125,7 +1129,7 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
      *
      * @property NAME
      * @type String
-     * @default 'TCalendar'
+     * @default 'TripCalendar'
      * @readOnly
      * @protected
      * @static
@@ -1432,6 +1436,17 @@ Y.TripCalendar = Y.extend(Calendar, Y.Base, {
                 if(!v) this._dateMap = null;
                 return v;
             }
+        },
+        
+        /**
+         * 是否自动切换到结束时间
+         *
+         * @attribute isAutoSwitch
+         * @type Boole
+         * @default false
+         */
+        isAutoSwitch: {
+            value: false
         }
     }
 });
